@@ -21,34 +21,43 @@ class Test_FormatItem extends TestCase {
 		$this->assertTrue( is_array( $item ) );
 		$this->assertArrayHasKey( 'url', $item );
 		$this->assertArrayHasKey( 'mobile', $item );
+		$this->assertArrayHasKey( 'source', $item );
 		$this->assertSame( 'https://example.org', $item['url'] );
 		$this->assertFalse( $item['mobile'] );
+		$this->assertSame( '', $item['source'] );
 
 		$item = $stub->format_item(
 			[
 				'url'    => 'https://example.org',
 				'mobile' => 0,
-			]
+				'source' => 'bigbang',
+			],
+			'foobar'
 		);
 
 		$this->assertTrue( is_array( $item ) );
 		$this->assertArrayHasKey( 'url', $item );
 		$this->assertArrayHasKey( 'mobile', $item );
+		$this->assertArrayHasKey( 'source', $item );
 		$this->assertSame( 'https://example.org', $item['url'] );
 		$this->assertFalse( $item['mobile'] );
+		$this->assertSame( 'bigbang', $item['source'] );
 
 		$item = $stub->format_item(
 			[
 				'url'    => 'https://example.org',
 				'mobile' => 1,
-			]
+			],
+			23
 		);
 
 		$this->assertTrue( is_array( $item ) );
 		$this->assertArrayHasKey( 'url', $item );
 		$this->assertArrayHasKey( 'mobile', $item );
+		$this->assertArrayHasKey( 'source', $item );
 		$this->assertSame( 'https://example.org', $item['url'] );
 		$this->assertTrue( $item['mobile'] );
+		$this->assertSame( '', $item['source'] );
 	}
 
 	public function testShouldReturnArrayWhenStringIsProvided() {
@@ -58,8 +67,10 @@ class Test_FormatItem extends TestCase {
 		$this->assertTrue( is_array( $item ) );
 		$this->assertArrayHasKey( 'url', $item );
 		$this->assertArrayHasKey( 'mobile', $item );
+		$this->assertArrayHasKey( 'source', $item );
 		$this->assertSame( 'https://example.org', $item['url'] );
 		$this->assertFalse( $item['mobile'] );
+		$this->assertSame( '', $item['source'] );
 	}
 
 	public function testShouldReturnEmptyArrayWhenInvalidArgIsProvided() {

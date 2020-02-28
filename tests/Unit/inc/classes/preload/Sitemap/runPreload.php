@@ -23,13 +23,21 @@ class Test_RunPreload extends TestCase {
 	}
 
 	public function testShouldPreloadSitemapsWhenValidUrls() {
-		$queue    = [];
-		$sitemaps = [
+		$this->transients = [];
+		$queue            = [];
+		$sitemaps         = [
 			'https://example.org/sitemap.xml',
 			'https://example.org/sitemap-mobile.xml',
 		];
 
 		// Stubs.
+		Functions\when( 'get_transient' )->alias( function( $transient ) {
+			return isset( $this->transients[ $transient ] ) ? $this->transients[ $transient ] : false;
+		} );
+		Functions\when( 'set_transient' )->alias( function( $transient, $value ) {
+			return $this->transients[ $transient ] = $value;
+		} );
+
 		$preload_process = $this->getMockBuilder( Full_Process::class )
 			->setMethods( [ 'is_mobile_preload_enabled', 'push_to_queue', 'save', 'dispatch' ] )
 			->getMock();
@@ -56,7 +64,6 @@ class Test_RunPreload extends TestCase {
 			return parse_url( $url, $component );
 		} );
 		Functions\when( 'get_rocket_cache_reject_uri' )->justReturn( '/foo/|/bar/|/(?:.+/)?embed/' );
-		Functions\when( 'set_transient' )->justReturn( null );
 
 		// Stubs for $this->process_sitemap().
 		Functions\when( 'esc_url_raw' )->returnArg();
@@ -68,9 +75,6 @@ class Test_RunPreload extends TestCase {
 					return [ 'body' => file_get_contents( WP_ROCKET_TESTS_FIXTURES_DIR . '/Preload/Sitemap/sitemap-mobile.xml' ) ];
 			}
 			return false;
-		} );
-		Functions\when( 'get_transient' )->alias( function( $transient ) {
-			return 'rocket_preload_errors' === $transient ? [] : false;
 		} );
 		Functions\when( 'is_wp_error' )->justReturn( false );
 		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 200 );
@@ -86,18 +90,21 @@ class Test_RunPreload extends TestCase {
 		$preload->run_preload( $sitemaps );
 
 		$expected = [
-			[ 'url' => 'https://example.org/', 'mobile' => false, 'source' => 'sitemap' ],
-			[ 'url' => 'https://example.org/', 'mobile' => true, 'source' => 'sitemap' ],
-			[ 'url' => 'https://example.org/fr/', 'mobile' => false, 'source' => 'sitemap' ],
-			[ 'url' => 'https://example.org/fr/', 'mobile' => true, 'source' => 'sitemap' ],
-			[ 'url' => 'https://example.org/es/', 'mobile' => false, 'source' => 'sitemap' ],
-			[ 'url' => 'https://example.org/es/', 'mobile' => true, 'source' => 'sitemap' ],
-			[ 'url' => 'https://example.org/mobile/de/', 'mobile' => true, 'source' => 'sitemap' ],
-			[ 'url' => 'https://example.org/mobile/fr/', 'mobile' => true, 'source' => 'sitemap' ],
-			[ 'url' => 'https://example.org/mobile/es/', 'mobile' => true, 'source' => 'sitemap' ],
+			[ 'url' => 'https://example.org/', 'mobile' => false, 'source' => $preload::PRELOAD_ID ],
+			[ 'url' => 'https://example.org/', 'mobile' => true, 'source' => $preload::PRELOAD_ID ],
+			[ 'url' => 'https://example.org/fr/', 'mobile' => false, 'source' => $preload::PRELOAD_ID ],
+			[ 'url' => 'https://example.org/fr/', 'mobile' => true, 'source' => $preload::PRELOAD_ID ],
+			[ 'url' => 'https://example.org/es/', 'mobile' => false, 'source' => $preload::PRELOAD_ID ],
+			[ 'url' => 'https://example.org/es/', 'mobile' => true, 'source' => $preload::PRELOAD_ID ],
+			[ 'url' => 'https://example.org/mobile/de/', 'mobile' => true, 'source' => $preload::PRELOAD_ID ],
+			[ 'url' => 'https://example.org/mobile/fr/', 'mobile' => true, 'source' => $preload::PRELOAD_ID ],
+			[ 'url' => 'https://example.org/mobile/es/', 'mobile' => true, 'source' => $preload::PRELOAD_ID ],
 		];
 
 		$this->assertSame( $expected, $queue );
 		$this->assertCount( 9, $queue );
+		$this->assertSame( 0, get_transient( sprintf( 'rocket_%s_preload_running', $preload::PRELOAD_ID ) ) );
+
+		$this->transients = [];
 	}
 }

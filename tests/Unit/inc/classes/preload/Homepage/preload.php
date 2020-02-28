@@ -12,6 +12,7 @@ use WP_Rocket\Preload\Homepage;
  * @group  Preload
  */
 class Test_Preload extends TestCase {
+	private $transients = [];
 
 	public function testShouldNotPreloadWhenInvalidUrls() {
 		$preload_process = $this->createMock( Full_Process::class );
@@ -39,14 +40,22 @@ class Test_Preload extends TestCase {
 	}
 
 	public function testShouldPreloadWhenValidUrls() {
-		$queue     = [];
-		$home_urls = [
+		$this->transients = [];
+		$queue            = [];
+		$home_urls        = [
 			[ 'url' => 'https://example.org' ],
 			[ 'url' => 'https://example.org/foobar/' ],
 			[ 'url' => 'https://example.org/category/barbaz/', 'mobile' => 1 ],
 		];
 
 		// Stubs.
+		Functions\when( 'get_transient' )->alias( function( $transient ) {
+			return isset( $this->transients[ $transient ] ) ? $this->transients[ $transient ] : false;
+		} );
+		Functions\when( 'set_transient' )->alias( function( $transient, $value ) {
+			return $this->transients[ $transient ] = $value;
+		} );
+
 		$preload_process = $this->getMockBuilder( Full_Process::class )
 		                        ->setMethods( [ 'is_mobile_preload_enabled', 'push_to_queue', 'save', 'dispatch' ] )
 		                        ->getMock();
@@ -72,7 +81,6 @@ class Test_Preload extends TestCase {
 		Functions\when( 'wp_parse_url' )->alias( function( $url, $component = - 1 ) {
 			return parse_url( $url, $component );
 		} );
-		Functions\when( 'set_transient' )->justReturn( null );
 
 		// Stubs for $this->get_urls().
 		Functions\when( 'esc_url_raw' )->returnArg();
@@ -89,9 +97,6 @@ class Test_Preload extends TestCase {
 			}
 
 			return false;
-		} );
-		Functions\when( 'get_transient' )->alias( function( $transient ) {
-			return 'rocket_preload_errors' === $transient ? [] : false;
 		} );
 		Functions\when( 'is_wp_error' )->justReturn( false );
 		Functions\when( 'wp_remote_retrieve_response_code' )->justReturn( 200 );
@@ -124,17 +129,20 @@ class Test_Preload extends TestCase {
 		$preload->preload( $home_urls );
 
 		$expected = [
-			[ 'url' => 'https://example.org/fr', 'mobile' => false, 'source' => 'homepage' ],
-			[ 'url' => 'https://example.org/es', 'mobile' => false, 'source' => 'homepage' ],
-			[ 'url' => 'https://example.org/de', 'mobile' => false, 'source' => 'homepage' ],
-			[ 'url' => 'https://example.org/mobile', 'mobile' => true, 'source' => 'homepage' ],
-			[ 'url' => 'https://example.org/mobile/it', 'mobile' => true, 'source' => 'homepage' ],
-			[ 'url' => 'https://example.org/mobile/fr', 'mobile' => true, 'source' => 'homepage' ],
-			[ 'url' => 'https://example.org/mobile/es', 'mobile' => true, 'source' => 'homepage' ],
-			[ 'url' => 'https://example.org/mobile/de', 'mobile' => true, 'source' => 'homepage' ],
+			[ 'url' => 'https://example.org/fr', 'mobile' => false, 'source' => $preload::PRELOAD_ID ],
+			[ 'url' => 'https://example.org/es', 'mobile' => false, 'source' => $preload::PRELOAD_ID ],
+			[ 'url' => 'https://example.org/de', 'mobile' => false, 'source' => $preload::PRELOAD_ID ],
+			[ 'url' => 'https://example.org/mobile', 'mobile' => true, 'source' => $preload::PRELOAD_ID ],
+			[ 'url' => 'https://example.org/mobile/it', 'mobile' => true, 'source' => $preload::PRELOAD_ID ],
+			[ 'url' => 'https://example.org/mobile/fr', 'mobile' => true, 'source' => $preload::PRELOAD_ID ],
+			[ 'url' => 'https://example.org/mobile/es', 'mobile' => true, 'source' => $preload::PRELOAD_ID ],
+			[ 'url' => 'https://example.org/mobile/de', 'mobile' => true, 'source' => $preload::PRELOAD_ID ],
 		];
 
 		$this->assertSame( $expected, $queue );
 		$this->assertCount( 8, $queue );
+		$this->assertSame( 2, get_transient( sprintf( 'rocket_%s_preload_running', $preload::PRELOAD_ID ) ) );
+
+		$this->transients = [];
 	}
 }
